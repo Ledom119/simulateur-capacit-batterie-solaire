@@ -52,6 +52,11 @@
       margin-bottom:18px;
     }
 
+    .network-breakdown,
+    .annual-network-result{
+      margin-bottom:18px;
+    }
+
     .monthly-consumption-grid{
       display:grid;
       grid-template-columns:repeat(12, minmax(0, 1fr));
@@ -189,7 +194,7 @@
 
     .charts-grid{
       display:grid;
-      grid-template-columns:repeat(3, minmax(0, 1fr));
+      grid-template-columns:repeat(2, minmax(0, 1fr));
       gap:18px;
       align-items:stretch;
     }
@@ -251,6 +256,7 @@
     .legend-dot.blue{ background:var(--blue); }
     .legend-dot.green{ background:var(--green); border:1px solid #a7d000; }
     .legend-dot.consumption{ background:var(--consumption); }
+    .legend-dot.red{ background:var(--red); }
     .legend-line.red{
       width:18px;
       height:0;
@@ -357,9 +363,10 @@
         <select id="winterSelfConsumption">
           <option value="5">5 %</option>
           <option value="15">15 %</option>
-          <option value="25" selected>25 %</option>
+          <option value="25">25 %</option>
           <option value="35">35 %</option>
           <option value="45">45 %</option>
+          <option value="50" selected>50 %</option>
           <option value="55">55 %</option>
           <option value="65">65 %</option>
           <option value="75">75 %</option>
@@ -448,6 +455,7 @@
         </div>
       </div>
     </div>
+    </div>
 
     <div class="chart-card">
       <h3 class="chart-title">Part du surplus solaire théoriquement stockable</h3>
@@ -478,6 +486,37 @@
         </div>
       </div>
     </div>
+
+    <div class="card network-breakdown">
+      <label class="field-label">Énergie mensuelle à prélever sur le réseau</label>
+      <span class="field-help">
+        Cette énergie correspond à la consommation du mois moins l’énergie solaire autoconsommée directement et l’énergie théoriquement récupérable depuis la batterie.
+      </span>
+      <div class="monthly-consumption-grid" id="monthlyNetworkGrid"></div>
+    </div>
+
+    <div class="result-card dark annual-network-result">
+      <div class="result-title">Énergie annuelle estimée à acheter au réseau</div>
+      <div>
+        <span class="result-number" id="annualNetworkPurchase">0</span>
+        <span class="result-unit">kWh/an</span>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3 class="chart-title">Comment se répartit votre consommation ?</h3>
+      <p class="chart-subtitle">
+        Pour chaque mois, la consommation totale est comparée à l’énergie solaire autoconsommée directement, à l’énergie utilisée depuis la batterie et au solde acheté au réseau.
+      </p>
+      <div class="chart-wrap">
+        <canvas id="consumptionBreakdownChart"></canvas>
+      </div>
+      <div class="legend-note">
+        <div class="legend-item"><span class="legend-dot consumption"></span><span>Consommation totale</span></div>
+        <div class="legend-item"><span class="legend-dot blue"></span><span>Autoconsommation directe</span></div>
+        <div class="legend-item"><span class="legend-dot green"></span><span>Énergie provenant de la batterie</span></div>
+        <div class="legend-item"><span class="legend-dot red"></span><span>Énergie achetée au réseau</span></div>
+      </div>
     </div>
 
     <div class="footnote">
@@ -496,18 +535,34 @@
 
     const daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31];
 
-    const normalConsumptionDistribution = [
-      10.5, 9.5, 9, 7.5, 7, 6.5,
-      6.5, 6.5, 7, 8, 9.5, 10.5
-    ];
+    // ================================================================
+    // ZONE FACILE À MODIFIER : RÉPARTITION MENSUELLE DE LA CONSOMMATION
+    // ================================================================
+    // Les 12 nombres correspondent, dans l'ordre, à :
+    // Jan, Fév, Mar, Avr, Mai, Juin, Juil, Août, Sep, Oct, Nov, Déc.
+    // Pour chaque profil, remplacez simplement les 12 nombres.
+    // Idéalement, le total des 12 valeurs doit être égal à 100 %.
+    // Exemple : normal: [10.5, 9.5, 9, 7.5, 7, 6.5, 6.5, 6.5, 7, 8, 9.5, 10.5]
 
     const consumptionDistributions = {
-      normal: normalConsumptionDistribution,
-      heatpump: normalConsumptionDistribution,
-      poolHeatpump: normalConsumptionDistribution,
-      ev: normalConsumptionDistribution,
-      poolEv: normalConsumptionDistribution
+
+      // 1. Ménage avec consommation normale
+      normal: [10.5, 9.5, 9, 7.5, 7, 6.5, 6.5, 6.5, 7, 8, 9.5, 10.5],
+
+      // 2. Ménage avec chauffage par pompe à chaleur
+      heatpump: [10.5, 9.5, 9, 7.5, 7, 6.5, 6.5, 6.5, 7, 8, 9.5, 10.5],
+
+      // 3. Ménage avec piscine et pompe à chaleur
+      poolHeatpump: [10.5, 9.5, 9, 7.5, 7, 6.5, 6.5, 6.5, 7, 8, 9.5, 10.5],
+
+      // 4. Ménage avec véhicule électrique
+      ev: [10.5, 9.5, 9, 7.5, 7, 6.5, 6.5, 6.5, 7, 8, 9.5, 10.5],
+
+      // 5. Ménage avec piscine et véhicule électrique
+      poolEv: [10.5, 9.5, 9, 7.5, 7, 6.5, 6.5, 6.5, 7, 8, 9.5, 10.5]
     };
+
+    // ====================== FIN DE LA ZONE À MODIFIER ======================
 
     const months = [
       "Jan","Fév","Mar","Avr","Mai","Juin",
@@ -519,6 +574,8 @@
     const annualConsumption = document.getElementById("annualConsumption");
     const consumptionProfile = document.getElementById("consumptionProfile");
     const monthlyConsumptionGrid = document.getElementById("monthlyConsumptionGrid");
+    const monthlyNetworkGrid = document.getElementById("monthlyNetworkGrid");
+    const annualNetworkPurchase = document.getElementById("annualNetworkPurchase");
     const panelCount = document.getElementById("panelCount");
     const panelPower = document.getElementById("panelPower");
     const winterSelfConsumption = document.getElementById("winterSelfConsumption");
@@ -757,9 +814,84 @@
       }
     );
 
+    const consumptionBreakdownChart = new Chart(
+      document.getElementById("consumptionBreakdownChart"),
+      {
+        type:"bar",
+        data:{
+          labels:months,
+          datasets:[
+            {
+              label:"Consommation totale",
+              data:[],
+              backgroundColor:"#37445d",
+              borderRadius:3,
+              maxBarThickness:34
+            },
+            {
+              label:"Autoconsommation directe",
+              data:[],
+              backgroundColor:"#4b65f7",
+              borderRadius:3,
+              maxBarThickness:34
+            },
+            {
+              label:"Énergie provenant de la batterie",
+              data:[],
+              backgroundColor:"#c5f90b",
+              borderColor:"#171717",
+              borderWidth:1,
+              borderRadius:3,
+              maxBarThickness:34
+            },
+            {
+              label:"Énergie achetée au réseau",
+              data:[],
+              backgroundColor:"#e45757",
+              borderRadius:3,
+              maxBarThickness:34
+            }
+          ]
+        },
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          animation:{ duration:350 },
+          plugins:{
+            legend:{ display:false },
+            tooltip:{
+              mode:"index",
+              intersect:false,
+              callbacks:{
+                label:(context) => {
+                  const value = context.raw || 0;
+                  return context.dataset.label + " : " +
+                    value.toLocaleString("fr-FR", {
+                      maximumFractionDigits:0
+                    }) + " kWh/mois";
+                }
+              }
+            }
+          },
+          scales:{
+            x:commonScales.x,
+            y:{
+              ...commonScales.y,
+              title:{
+                display:true,
+                text:"kWh / mois",
+                color:"#555",
+                font:{weight:"600"}
+              }
+            }
+          }
+        }
+      }
+    );
+
     function updateSimulator(){
       const annualUse = Math.max(0, parseFloat(annualConsumption.value) || 0);
-      const selectedDistribution = consumptionDistributions[consumptionProfile.value] || normalConsumptionDistribution;
+      const selectedDistribution = consumptionDistributions[consumptionProfile.value] || consumptionDistributions.normal;
       const count = Math.max(0, parseInt(panelCount.value, 10) || 0);
       const power = parseFloat(panelPower.value) || 0;
       const winterRate = (parseFloat(winterSelfConsumption.value) || 0) / 100;
@@ -788,12 +920,35 @@
       const batteryLine = months.map(() => battery);
       const monthlyConsumption = selectedDistribution.map(percent => annualUse * percent / 100);
       const dailyConsumption = monthlyConsumption.map((value, index) => value / daysInMonth[index]);
+      const directUsedDaily = dailyConsumption.map((consumption, index) => {
+        return Math.min(consumption, selfConsumedDaily[index]);
+      });
+      const batteryUsedDaily = dailyConsumption.map((consumption, index) => {
+        const remainingConsumption = Math.max(0, consumption - directUsedDaily[index]);
+        return Math.min(remainingConsumption, storableDaily[index]);
+      });
+      const networkDaily = dailyConsumption.map((consumption, index) => {
+        return Math.max(0, consumption - directUsedDaily[index] - batteryUsedDaily[index]);
+      });
+      const monthlyDirectUsed = directUsedDaily.map((value, index) => value * daysInMonth[index]);
+      const monthlyBatteryUsed = batteryUsedDaily.map((value, index) => value * daysInMonth[index]);
+      const monthlyNetworkPurchase = networkDaily.map((value, index) => value * daysInMonth[index]);
+      const yearlyNetworkPurchase = monthlyNetworkPurchase.reduce((sum, value) => sum + value, 0);
 
       monthlyConsumptionGrid.innerHTML = months.map((month, index) => {
         const value = monthlyConsumption[index].toLocaleString("fr-FR", { maximumFractionDigits:0 });
         const percent = selectedDistribution[index].toLocaleString("fr-FR", { maximumFractionDigits:1 });
         return `<div class="monthly-consumption-item"><strong>${month}</strong><span>${value} kWh</span><span class="monthly-consumption-percent">${percent} %</span></div>`;
       }).join("");
+
+      monthlyNetworkGrid.innerHTML = months.map((month, index) => {
+        const value = monthlyNetworkPurchase[index].toLocaleString("fr-FR", { maximumFractionDigits:0 });
+        return `<div class="monthly-consumption-item"><strong>${month}</strong><span>${value} kWh</span></div>`;
+      }).join("");
+
+      annualNetworkPurchase.textContent = yearlyNetworkPurchase.toLocaleString("fr-FR", {
+        maximumFractionDigits:0
+      });
 
       peakPower.textContent = kwp.toLocaleString("fr-FR", {
         minimumFractionDigits:2,
@@ -825,9 +980,22 @@
       batteryChart.data.datasets[3].data =
         batteryLine.map(v => Number(v.toFixed(2)));
 
+      consumptionBreakdownChart.data.datasets[0].data =
+        monthlyConsumption.map(v => Number(v.toFixed(2)));
+
+      consumptionBreakdownChart.data.datasets[1].data =
+        monthlyDirectUsed.map(v => Number(v.toFixed(2)));
+
+      consumptionBreakdownChart.data.datasets[2].data =
+        monthlyBatteryUsed.map(v => Number(v.toFixed(2)));
+
+      consumptionBreakdownChart.data.datasets[3].data =
+        monthlyNetworkPurchase.map(v => Number(v.toFixed(2)));
+
       monthlyChart.update();
       dailyChart.update();
       batteryChart.update();
+      consumptionBreakdownChart.update();
     }
 
     annualConsumption.addEventListener("input", updateSimulator);
