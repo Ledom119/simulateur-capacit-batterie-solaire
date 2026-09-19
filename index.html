@@ -257,6 +257,11 @@
     .legend-dot.green{ background:var(--green); border:1px solid #a7d000; }
     .legend-dot.consumption{ background:var(--consumption); }
     .legend-dot.red{ background:var(--red); }
+    .legend-dot.injection{ background:#f0b429; border:1px solid #b77c00; }
+    .legend-dot.dynamic{
+      background:repeating-linear-gradient(135deg, #8e5af7 0 3px, #efe9ff 3px 6px);
+      border:1px solid #5d35b5;
+    }
     .legend-line.red{
       width:18px;
       height:0;
@@ -506,16 +511,39 @@
     <div class="chart-card">
       <h3 class="chart-title">Comment se répartit votre consommation ?</h3>
       <p class="chart-subtitle">
-        Pour chaque mois, la consommation totale est comparée à l’énergie solaire autoconsommée directement, à l’énergie utilisée depuis la batterie et au solde acheté au réseau.
+        Chaque bâtonnet représente la consommation journalière moyenne du mois. La partie violette hachurée montre la part de l’énergie achetée
+        au réseau qui pourrait être achetée au tarif dynamique.
       </p>
       <div class="chart-wrap">
         <canvas id="consumptionBreakdownChart"></canvas>
       </div>
       <div class="legend-note">
-        <div class="legend-item"><span class="legend-dot consumption"></span><span>Consommation totale</span></div>
         <div class="legend-item"><span class="legend-dot blue"></span><span>Autoconsommation directe</span></div>
         <div class="legend-item"><span class="legend-dot green"></span><span>Énergie provenant de la batterie</span></div>
-        <div class="legend-item"><span class="legend-dot red"></span><span>Énergie achetée au réseau</span></div>
+        <div class="legend-item"><span class="legend-dot dynamic"></span><span>Achat réseau possible au tarif dynamique</span></div>
+        <div class="legend-item"><span class="legend-dot red"></span><span>Achat réseau hors tarif dynamique</span></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3 class="chart-title">Énergie solaire injectée au réseau</h3>
+      <p class="chart-subtitle">
+        Ce graphique présente, pour chaque mois, l’énergie solaire journalière moyenne qui reste après avoir retiré
+        l’énergie autoconsommée directement et celle stockée dans la batterie.
+      </p>
+      <div class="chart-wrap">
+        <canvas id="gridInjectionChart"></canvas>
+      </div>
+      <div class="legend-note">
+        <div class="legend-item"><span class="legend-dot injection"></span><span>Énergie injectée au réseau</span></div>
+      </div>
+    </div>
+
+    <div class="result-card dark annual-network-result">
+      <div class="result-title">Énergie annuelle estimée injectée au réseau</div>
+      <div>
+        <span class="result-number" id="annualGridInjection">0</span>
+        <span class="result-unit">kWh/an</span>
       </div>
     </div>
 
@@ -576,6 +604,7 @@
     const monthlyConsumptionGrid = document.getElementById("monthlyConsumptionGrid");
     const monthlyNetworkGrid = document.getElementById("monthlyNetworkGrid");
     const annualNetworkPurchase = document.getElementById("annualNetworkPurchase");
+    const annualGridInjection = document.getElementById("annualGridInjection");
     const panelCount = document.getElementById("panelCount");
     const panelPower = document.getElementById("panelPower");
     const winterSelfConsumption = document.getElementById("winterSelfConsumption");
@@ -814,6 +843,26 @@
       }
     );
 
+    function createDynamicTariffPattern(){
+      const patternCanvas = document.createElement("canvas");
+      patternCanvas.width = 12;
+      patternCanvas.height = 12;
+      const patternContext = patternCanvas.getContext("2d");
+      patternContext.fillStyle = "#efe9ff";
+      patternContext.fillRect(0, 0, 12, 12);
+      patternContext.strokeStyle = "#8e5af7";
+      patternContext.lineWidth = 3;
+      patternContext.beginPath();
+      patternContext.moveTo(-3, 12);
+      patternContext.lineTo(12, -3);
+      patternContext.moveTo(3, 15);
+      patternContext.lineTo(15, 3);
+      patternContext.stroke();
+      return patternContext.createPattern(patternCanvas, "repeat");
+    }
+
+    const dynamicTariffPattern = createDynamicTariffPattern();
+
     const consumptionBreakdownChart = new Chart(
       document.getElementById("consumptionBreakdownChart"),
       {
@@ -822,18 +871,12 @@
           labels:months,
           datasets:[
             {
-              label:"Consommation totale",
-              data:[],
-              backgroundColor:"#37445d",
-              borderRadius:3,
-              maxBarThickness:34
-            },
-            {
               label:"Autoconsommation directe",
               data:[],
               backgroundColor:"#4b65f7",
               borderRadius:3,
-              maxBarThickness:34
+              maxBarThickness:42,
+              stack:"consumption"
             },
             {
               label:"Énergie provenant de la batterie",
@@ -842,14 +885,26 @@
               borderColor:"#171717",
               borderWidth:1,
               borderRadius:3,
-              maxBarThickness:34
+              maxBarThickness:42,
+              stack:"consumption"
             },
             {
-              label:"Énergie achetée au réseau",
+              label:"Achat réseau possible au tarif dynamique",
+              data:[],
+              backgroundColor:dynamicTariffPattern,
+              borderColor:"#5d35b5",
+              borderWidth:1,
+              borderRadius:3,
+              maxBarThickness:42,
+              stack:"consumption"
+            },
+            {
+              label:"Achat réseau hors tarif dynamique",
               data:[],
               backgroundColor:"#e45757",
               borderRadius:3,
-              maxBarThickness:34
+              maxBarThickness:42,
+              stack:"consumption"
             }
           ]
         },
@@ -867,8 +922,74 @@
                   const value = context.raw || 0;
                   return context.dataset.label + " : " +
                     value.toLocaleString("fr-FR", {
-                      maximumFractionDigits:0
-                    }) + " kWh/mois";
+                      minimumFractionDigits:1,
+                      maximumFractionDigits:1
+                    }) + " kWh/jour";
+                },
+                footer:(items) => {
+                  const total = items
+                    .filter(item => item.dataset.stack === "consumption")
+                    .reduce((sum, item) => sum + (Number(item.raw) || 0), 0);
+                  return "Consommation totale : " + total.toLocaleString("fr-FR", {
+                    minimumFractionDigits:1,
+                    maximumFractionDigits:1
+                  }) + " kWh/jour";
+                }
+              }
+            }
+          },
+          scales:{
+            x:{
+              ...commonScales.x,
+              stacked:true
+            },
+            y:{
+              ...commonScales.y,
+              stacked:true,
+              title:{
+                display:true,
+                text:"kWh / jour",
+                color:"#555",
+                font:{weight:"600"}
+              }
+            }
+          }
+        }
+      }
+    );
+
+    const gridInjectionChart = new Chart(
+      document.getElementById("gridInjectionChart"),
+      {
+        type:"bar",
+        data:{
+          labels:months,
+          datasets:[
+            {
+              label:"Énergie injectée au réseau",
+              data:[],
+              backgroundColor:"#f0b429",
+              borderColor:"#b77c00",
+              borderWidth:1,
+              borderRadius:4,
+              maxBarThickness:54
+            }
+          ]
+        },
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          animation:{ duration:350 },
+          plugins:{
+            legend:{ display:false },
+            tooltip:{
+              callbacks:{
+                label:(context) => {
+                  const value = context.raw || 0;
+                  return "Énergie injectée : " + value.toLocaleString("fr-FR", {
+                    minimumFractionDigits:1,
+                    maximumFractionDigits:1
+                  }) + " kWh/jour";
                 }
               }
             }
@@ -879,7 +1000,7 @@
               ...commonScales.y,
               title:{
                 display:true,
-                text:"kWh / mois",
+                text:"kWh / jour",
                 color:"#555",
                 font:{weight:"600"}
               }
@@ -930,6 +1051,21 @@
       const networkDaily = dailyConsumption.map((consumption, index) => {
         return Math.max(0, consumption - directUsedDaily[index] - batteryUsedDaily[index]);
       });
+      const dynamicTariffPurchaseDaily = batteryUsedDaily.map((value, index) => {
+        const availableBatteryCapacity = Math.max(0, battery - value);
+        return Math.min(availableBatteryCapacity, networkDaily[index]);
+      });
+      const storedSolarDaily = daily.map((production, index) => {
+        const solarAvailableAfterDirectUse = Math.max(0, production - directUsedDaily[index]);
+        return Math.min(storableDaily[index], solarAvailableAfterDirectUse);
+      });
+      const gridInjectionDaily = daily.map((production, index) => {
+        return Math.max(0, production - directUsedDaily[index] - storedSolarDaily[index]);
+      });
+      const monthlyGridInjection = gridInjectionDaily.map((value, index) => {
+        return value * daysInMonth[index];
+      });
+      const yearlyGridInjection = monthlyGridInjection.reduce((sum, value) => sum + value, 0);
       const monthlyDirectUsed = directUsedDaily.map((value, index) => value * daysInMonth[index]);
       const monthlyBatteryUsed = batteryUsedDaily.map((value, index) => value * daysInMonth[index]);
       const monthlyNetworkPurchase = networkDaily.map((value, index) => value * daysInMonth[index]);
@@ -947,6 +1083,10 @@
       }).join("");
 
       annualNetworkPurchase.textContent = yearlyNetworkPurchase.toLocaleString("fr-FR", {
+        maximumFractionDigits:0
+      });
+
+      annualGridInjection.textContent = yearlyGridInjection.toLocaleString("fr-FR", {
         maximumFractionDigits:0
       });
 
@@ -981,21 +1121,27 @@
         batteryLine.map(v => Number(v.toFixed(2)));
 
       consumptionBreakdownChart.data.datasets[0].data =
-        monthlyConsumption.map(v => Number(v.toFixed(2)));
+        directUsedDaily.map(v => Number(v.toFixed(2)));
 
       consumptionBreakdownChart.data.datasets[1].data =
-        monthlyDirectUsed.map(v => Number(v.toFixed(2)));
+        batteryUsedDaily.map(v => Number(v.toFixed(2)));
 
       consumptionBreakdownChart.data.datasets[2].data =
-        monthlyBatteryUsed.map(v => Number(v.toFixed(2)));
+        dynamicTariffPurchaseDaily.map(v => Number(v.toFixed(2)));
 
       consumptionBreakdownChart.data.datasets[3].data =
-        monthlyNetworkPurchase.map(v => Number(v.toFixed(2)));
+        networkDaily.map((value, index) => {
+          return Number(Math.max(0, value - dynamicTariffPurchaseDaily[index]).toFixed(2));
+        });
+
+      gridInjectionChart.data.datasets[0].data =
+        gridInjectionDaily.map(v => Number(v.toFixed(2)));
 
       monthlyChart.update();
       dailyChart.update();
       batteryChart.update();
       consumptionBreakdownChart.update();
+      gridInjectionChart.update();
     }
 
     annualConsumption.addEventListener("input", updateSimulator);
