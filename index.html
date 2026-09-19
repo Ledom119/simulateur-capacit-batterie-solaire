@@ -10,7 +10,8 @@
   <style>
     :root{
       --green:#c5f90b;
-      --blue:#2387d9;
+      --blue:#4b65f7;
+      --consumption:#37445d;
       --red:#e45757;
       --dark:#171717;
       --text:#222;
@@ -38,6 +39,7 @@
     }
 
     .solar-form,
+    .consumption-form,
     .autoconsumption-form,
     .battery-form{
       display:grid;
@@ -46,11 +48,44 @@
       margin-bottom:18px;
     }
 
+    .consumption-breakdown{
+      margin-bottom:18px;
+    }
+
+    .monthly-consumption-grid{
+      display:grid;
+      grid-template-columns:repeat(12, minmax(0, 1fr));
+      gap:8px;
+      margin-top:14px;
+    }
+
+    .monthly-consumption-item{
+      padding:10px 4px;
+      border-radius:8px;
+      background:#f6f6f6;
+      text-align:center;
+    }
+
+    .monthly-consumption-item strong,
+    .monthly-consumption-item span{
+      display:block;
+    }
+
+    .monthly-consumption-item strong{ font-size:13px; }
+    .monthly-consumption-item span{ margin-top:4px; font-size:12px; color:var(--muted); }
+    .monthly-consumption-item .monthly-consumption-percent{
+      margin-top:3px;
+      color:var(--dark);
+      font-weight:700;
+      white-space:nowrap;
+    }
+
     .battery-form{
       grid-template-columns:1fr;
-      max-width:580px;
-      margin-left:auto;
-      margin-right:auto;
+      width:100%;
+      max-width:none;
+      margin-left:0;
+      margin-right:0;
     }
 
     .card{
@@ -152,6 +187,23 @@
       box-shadow:0 8px 24px rgba(0,0,0,.05);
     }
 
+    .charts-grid{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:18px;
+      align-items:stretch;
+    }
+
+    .charts-grid .chart-card{
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .charts-grid .chart-wrap{
+      margin-top:auto;
+    }
+
     .chart-title{
       margin:0 0 5px 0;
       font-size:20px;
@@ -198,6 +250,7 @@
 
     .legend-dot.blue{ background:var(--blue); }
     .legend-dot.green{ background:var(--green); border:1px solid #a7d000; }
+    .legend-dot.consumption{ background:var(--consumption); }
     .legend-line.red{
       width:18px;
       height:0;
@@ -217,6 +270,7 @@
       body{ padding:6px; }
 
       .solar-form,
+      .consumption-form,
       .autoconsumption-form,
       .results,
       .battery-form{
@@ -237,12 +291,44 @@
       .chart-title{ font-size:18px; }
 
       .chart-wrap{ height:300px; }
+
+      .monthly-consumption-grid{ grid-template-columns:repeat(3, 1fr); }
+    }
+
+    @media(max-width:1050px){
+      .charts-grid{ grid-template-columns:1fr; }
     }
   </style>
 </head>
 
 <body>
   <div class="solar-simulator">
+
+    <div class="consumption-form">
+      <div class="card">
+        <label class="field-label" for="annualConsumption">Consommation électrique annuelle (kWh/an)</label>
+        <span class="field-help">Indiquez la consommation totale reprise sur votre facture annuelle.</span>
+        <input id="annualConsumption" type="number" min="0" step="100" value="5000" inputmode="numeric">
+      </div>
+
+      <div class="card">
+        <label class="field-label" for="consumptionProfile">Profil de consommation</label>
+        <span class="field-help">Les répartitions spécifiques seront précisées dans une prochaine étape.</span>
+        <select id="consumptionProfile">
+          <option value="normal" selected>Consommation d’un ménage normal</option>
+          <option value="heatpump">Consommation avec chauffage par pompe à chaleur</option>
+          <option value="poolHeatpump">Consommation avec piscine et pompe à chaleur</option>
+          <option value="ev">Consommation avec véhicule électrique</option>
+          <option value="poolEv">Consommation avec piscine et véhicule électrique</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card consumption-breakdown">
+      <label class="field-label">Répartition mensuelle estimée de la consommation</label>
+      <span class="field-help">Calculée à partir de la consommation annuelle et du profil sélectionné.</span>
+      <div class="monthly-consumption-grid" id="monthlyConsumptionGrid"></div>
+    </div>
 
     <div class="solar-form">
       <div class="card">
@@ -253,12 +339,13 @@
       <div class="card">
         <label class="field-label" for="panelPower">Puissance d'un panneau</label>
         <select id="panelPower">
+          <option value="250">250 Wc</option>
           <option value="300">300 Wc</option>
           <option value="350">350 Wc</option>
           <option value="400">400 Wc</option>
           <option value="450" selected>450 Wc</option>
           <option value="500">500 Wc</option>
-          <option value="505">505 Wc</option>
+          <option value="550">550 Wc</option>
         </select>
       </div>
     </div>
@@ -317,6 +404,22 @@
       </div>
     </div>
 
+    <div class="battery-form">
+      <div class="card">
+        <label class="field-label" for="batteryCapacity">Capacité de la batterie</label>
+        <span class="field-help">
+          Sélectionnez une capacité pour comparer le surplus solaire journalier moyen
+          à la capacité théorique de stockage de la batterie.
+        </span>
+        <select id="batteryCapacity">
+          <option value="5">5 kWh</option>
+          <option value="10" selected>10 kWh</option>
+          <option value="16">16 kWh</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="charts-grid">
     <div class="chart-card">
       <h3 class="chart-title">Production solaire mensuelle estimée</h3>
       <p class="chart-subtitle">Production totale estimée de l'installation pour chaque mois.</p>
@@ -346,25 +449,10 @@
       </div>
     </div>
 
-    <div class="battery-form">
-      <div class="card">
-        <label class="field-label" for="batteryCapacity">Capacité de la batterie</label>
-        <span class="field-help">
-          Sélectionnez une capacité pour comparer le surplus solaire journalier moyen
-          à la capacité théorique de stockage de la batterie.
-        </span>
-        <select id="batteryCapacity">
-          <option value="5">5 kWh</option>
-          <option value="10" selected>10 kWh</option>
-          <option value="16">16 kWh</option>
-        </select>
-      </div>
-    </div>
-
     <div class="chart-card">
       <h3 class="chart-title">Part du surplus solaire théoriquement stockable</h3>
       <p class="chart-subtitle">
-        En vert : surplus solaire journalier moyen. En bleu : part pouvant être stockée.
+        En vert : surplus solaire journalier moyen. En bleu : part pouvant être stockée. En noir : consommation journalière moyenne.
         La ligne rouge représente la capacité de batterie choisie.
       </p>
       <div class="chart-wrap">
@@ -381,10 +469,15 @@
           <span>Part théoriquement stockable</span>
         </div>
         <div class="legend-item">
+          <span class="legend-dot consumption"></span>
+          <span>Consommation journalière</span>
+        </div>
+        <div class="legend-item">
           <span class="legend-line red"></span>
           <span>Capacité batterie</span>
         </div>
       </div>
+    </div>
     </div>
 
     <div class="footnote">
@@ -403,6 +496,19 @@
 
     const daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31];
 
+    const normalConsumptionDistribution = [
+      10.5, 9.5, 9, 7.5, 7, 6.5,
+      6.5, 6.5, 7, 8, 9.5, 10.5
+    ];
+
+    const consumptionDistributions = {
+      normal: normalConsumptionDistribution,
+      heatpump: normalConsumptionDistribution,
+      poolHeatpump: normalConsumptionDistribution,
+      ev: normalConsumptionDistribution,
+      poolEv: normalConsumptionDistribution
+    };
+
     const months = [
       "Jan","Fév","Mar","Avr","Mai","Juin",
       "Juil","Août","Sep","Oct","Nov","Déc"
@@ -410,6 +516,9 @@
 
     const winterMonths = new Set([0,1,2,10,11]);
 
+    const annualConsumption = document.getElementById("annualConsumption");
+    const consumptionProfile = document.getElementById("consumptionProfile");
+    const monthlyConsumptionGrid = document.getElementById("monthlyConsumptionGrid");
     const panelCount = document.getElementById("panelCount");
     const panelPower = document.getElementById("panelPower");
     const winterSelfConsumption = document.getElementById("winterSelfConsumption");
@@ -493,7 +602,7 @@
             {
               label:"Énergie autoconsommée",
               data:[],
-              backgroundColor:"#2387d9",
+              backgroundColor:"#4b65f7",
               borderWidth:0,
               borderRadius:3,
               stack:"production",
@@ -581,7 +690,17 @@
               type:"bar",
               label:"Part théoriquement stockable",
               data:[],
-              backgroundColor:"#2387d9",
+              backgroundColor:"#4b65f7",
+              borderWidth:0,
+              borderRadius:3,
+              maxBarThickness:30,
+              order:1
+            },
+            {
+              type:"bar",
+              label:"Consommation journalière",
+              data:[],
+              backgroundColor:"#37445d",
               borderWidth:0,
               borderRadius:3,
               maxBarThickness:30,
@@ -639,6 +758,8 @@
     );
 
     function updateSimulator(){
+      const annualUse = Math.max(0, parseFloat(annualConsumption.value) || 0);
+      const selectedDistribution = consumptionDistributions[consumptionProfile.value] || normalConsumptionDistribution;
       const count = Math.max(0, parseInt(panelCount.value, 10) || 0);
       const power = parseFloat(panelPower.value) || 0;
       const winterRate = (parseFloat(winterSelfConsumption.value) || 0) / 100;
@@ -665,6 +786,14 @@
       });
 
       const batteryLine = months.map(() => battery);
+      const monthlyConsumption = selectedDistribution.map(percent => annualUse * percent / 100);
+      const dailyConsumption = monthlyConsumption.map((value, index) => value / daysInMonth[index]);
+
+      monthlyConsumptionGrid.innerHTML = months.map((month, index) => {
+        const value = monthlyConsumption[index].toLocaleString("fr-FR", { maximumFractionDigits:0 });
+        const percent = selectedDistribution[index].toLocaleString("fr-FR", { maximumFractionDigits:1 });
+        return `<div class="monthly-consumption-item"><strong>${month}</strong><span>${value} kWh</span><span class="monthly-consumption-percent">${percent} %</span></div>`;
+      }).join("");
 
       peakPower.textContent = kwp.toLocaleString("fr-FR", {
         minimumFractionDigits:2,
@@ -691,6 +820,9 @@
         storableDaily.map(v => Number(v.toFixed(2)));
 
       batteryChart.data.datasets[2].data =
+        dailyConsumption.map(v => Number(v.toFixed(2)));
+
+      batteryChart.data.datasets[3].data =
         batteryLine.map(v => Number(v.toFixed(2)));
 
       monthlyChart.update();
@@ -698,6 +830,8 @@
       batteryChart.update();
     }
 
+    annualConsumption.addEventListener("input", updateSimulator);
+    consumptionProfile.addEventListener("change", updateSimulator);
     panelCount.addEventListener("input", updateSimulator);
     panelPower.addEventListener("change", updateSimulator);
     winterSelfConsumption.addEventListener("change", updateSimulator);
