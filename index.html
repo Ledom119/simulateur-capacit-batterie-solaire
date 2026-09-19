@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulateur de production solaire</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root{
+      --green:#c5f90b;
+      --blue:#2387d9;
+      --red:#e45757;
+      --dark:#171717;
+      --text:#222;
+      --muted:#6f6f6f;
+      --line:#e6e6e6;
+      --white:#ffffff;
+    }
+
+    *{ box-sizing:border-box; }
+
+    html, body{
+      margin:0;
+      padding:0;
+      background:transparent;
+      font-family:Arial, Helvetica, sans-serif;
+      color:var(--text);
+    }
+
+    body{ padding:10px; }
+
+    .solar-simulator{
+      width:100%;
+      max-width:1180px;
+      margin:0 auto;
+    }
+
+    .solar-form,
+    .autoconsumption-form,
+    .battery-form{
+      display:grid;
+      grid-template-columns:repeat(2, 1fr);
+      gap:18px;
+      margin-bottom:18px;
+    }
+
+    .battery-form{
+      grid-template-columns:1fr;
+      max-width:580px;
+      margin-left:auto;
+      margin-right:auto;
+    }
+
+    .card{
+      background:var(--white);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:20px;
+      box-shadow:0 8px 24px rgba(0,0,0,.05);
+    }
+
+    .field-label{
+      display:block;
+      font-size:16px;
+      font-weight:700;
+      margin-bottom:7px;
+    }
+
+    .field-help{
+      display:block;
+      color:var(--muted);
+      font-size:12px;
+      margin-bottom:10px;
+      line-height:1.45;
+    }
+
+    input,
+    select{
+      width:100%;
+      height:50px;
+      border:1px solid #d3d3d3;
+      border-radius:9px;
+      background:#fff;
+      color:var(--dark);
+      padding:0 14px;
+      font-size:17px;
+      outline:none;
+    }
+
+    input:focus,
+    select:focus{
+      border-color:var(--green);
+      box-shadow:0 0 0 3px rgba(197,249,11,.22);
+    }
+
+    .results{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:18px;
+      margin-bottom:18px;
+    }
+
+    .result-card{
+      min-height:122px;
+      border-radius:14px;
+      padding:22px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      text-align:center;
+    }
+
+    .result-card.dark{
+      background:var(--dark);
+      color:#fff;
+    }
+
+    .result-card.green{
+      background:var(--green);
+      color:#111;
+    }
+
+    .result-title{
+      font-size:15px;
+      font-weight:600;
+      opacity:.82;
+      margin-bottom:8px;
+    }
+
+    .result-number{
+      font-size:34px;
+      line-height:1;
+      font-weight:800;
+      letter-spacing:-1px;
+    }
+
+    .result-unit{
+      font-size:16px;
+      font-weight:700;
+      margin-left:4px;
+    }
+
+    .chart-card{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:22px;
+      margin-bottom:18px;
+      box-shadow:0 8px 24px rgba(0,0,0,.05);
+    }
+
+    .chart-title{
+      margin:0 0 5px 0;
+      font-size:20px;
+      line-height:1.3;
+      font-weight:800;
+      color:var(--dark);
+    }
+
+    .chart-subtitle{
+      margin:0 0 18px 0;
+      font-size:13px;
+      line-height:1.5;
+      color:var(--muted);
+    }
+
+    .chart-wrap{
+      position:relative;
+      width:100%;
+      height:330px;
+    }
+
+    .legend-note{
+      display:flex;
+      justify-content:center;
+      flex-wrap:wrap;
+      gap:18px;
+      margin-top:12px;
+      font-size:13px;
+      font-weight:600;
+    }
+
+    .legend-item{
+      display:flex;
+      align-items:center;
+      gap:7px;
+    }
+
+    .legend-dot,
+    .legend-line{
+      width:12px;
+      height:12px;
+      border-radius:3px;
+    }
+
+    .legend-dot.blue{ background:var(--blue); }
+    .legend-dot.green{ background:var(--green); border:1px solid #a7d000; }
+    .legend-line.red{
+      width:18px;
+      height:0;
+      border-top:3px solid var(--red);
+      border-radius:0;
+    }
+
+    .footnote{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.5;
+      text-align:center;
+      padding:2px 10px 8px;
+    }
+
+    @media(max-width:760px){
+      body{ padding:6px; }
+
+      .solar-form,
+      .autoconsumption-form,
+      .results,
+      .battery-form{
+        grid-template-columns:1fr;
+        gap:12px;
+      }
+
+      .card,
+      .chart-card{
+        padding:16px;
+        border-radius:12px;
+      }
+
+      .result-card{ min-height:105px; }
+
+      .result-number{ font-size:29px; }
+
+      .chart-title{ font-size:18px; }
+
+      .chart-wrap{ height:300px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="solar-simulator">
+
+    <div class="solar-form">
+      <div class="card">
+        <label class="field-label" for="panelCount">Nombre de panneaux solaires</label>
+        <input id="panelCount" type="number" min="1" step="1" value="10" inputmode="numeric">
+      </div>
+
+      <div class="card">
+        <label class="field-label" for="panelPower">Puissance d'un panneau</label>
+        <select id="panelPower">
+          <option value="300">300 Wc</option>
+          <option value="350">350 Wc</option>
+          <option value="400">400 Wc</option>
+          <option value="450" selected>450 Wc</option>
+          <option value="500">500 Wc</option>
+          <option value="505">505 Wc</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="autoconsumption-form">
+      <div class="card">
+        <label class="field-label" for="winterSelfConsumption">Taux d'autoconsommation hivernal</label>
+        <span class="field-help">Appliqué de novembre à mars</span>
+        <select id="winterSelfConsumption">
+          <option value="5">5 %</option>
+          <option value="15">15 %</option>
+          <option value="25" selected>25 %</option>
+          <option value="35">35 %</option>
+          <option value="45">45 %</option>
+          <option value="55">55 %</option>
+          <option value="65">65 %</option>
+          <option value="75">75 %</option>
+          <option value="85">85 %</option>
+          <option value="95">95 %</option>
+        </select>
+      </div>
+
+      <div class="card">
+        <label class="field-label" for="summerSelfConsumption">Taux d'autoconsommation estival</label>
+        <span class="field-help">Appliqué d'avril à octobre</span>
+        <select id="summerSelfConsumption">
+          <option value="5">5 %</option>
+          <option value="15">15 %</option>
+          <option value="25" selected>25 %</option>
+          <option value="35">35 %</option>
+          <option value="45">45 %</option>
+          <option value="55">55 %</option>
+          <option value="65">65 %</option>
+          <option value="75">75 %</option>
+          <option value="85">85 %</option>
+          <option value="95">95 %</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="results">
+      <div class="result-card dark">
+        <div class="result-title">Puissance crête de l'installation</div>
+        <div>
+          <span class="result-number" id="peakPower">4,50</span>
+          <span class="result-unit">kWc</span>
+        </div>
+      </div>
+
+      <div class="result-card green">
+        <div class="result-title">Production solaire annuelle estimée</div>
+        <div>
+          <span class="result-number" id="annualProduction">4 729</span>
+          <span class="result-unit">kWh/an</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3 class="chart-title">Production solaire mensuelle estimée</h3>
+      <p class="chart-subtitle">Production totale estimée de l'installation pour chaque mois.</p>
+      <div class="chart-wrap">
+        <canvas id="monthlyChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3 class="chart-title">Production journalière moyenne et autoconsommation</h3>
+      <p class="chart-subtitle">
+        La hauteur totale de chaque barre représente la production solaire journalière moyenne.
+      </p>
+      <div class="chart-wrap">
+        <canvas id="dailyChart"></canvas>
+      </div>
+
+      <div class="legend-note">
+        <div class="legend-item">
+          <span class="legend-dot blue"></span>
+          <span>Énergie autoconsommée</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot green"></span>
+          <span>Surplus solaire</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="battery-form">
+      <div class="card">
+        <label class="field-label" for="batteryCapacity">Capacité de la batterie</label>
+        <span class="field-help">
+          Sélectionnez une capacité pour comparer le surplus solaire journalier moyen
+          à la capacité théorique de stockage de la batterie.
+        </span>
+        <select id="batteryCapacity">
+          <option value="5">5 kWh</option>
+          <option value="10" selected>10 kWh</option>
+          <option value="16">16 kWh</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3 class="chart-title">Part du surplus solaire théoriquement stockable</h3>
+      <p class="chart-subtitle">
+        En vert : surplus solaire journalier moyen. En bleu : part pouvant être stockée.
+        La ligne rouge représente la capacité de batterie choisie.
+      </p>
+      <div class="chart-wrap">
+        <canvas id="batteryChart"></canvas>
+      </div>
+
+      <div class="legend-note">
+        <div class="legend-item">
+          <span class="legend-dot green"></span>
+          <span>Surplus solaire</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot blue"></span>
+          <span>Part théoriquement stockable</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-line red"></span>
+          <span>Capacité batterie</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footnote">
+      Estimation calculée à partir d'une production de référence de 1&nbsp;050,98 kWh/an pour 1 kWc installé.
+      Le taux hivernal est appliqué de novembre à mars et le taux estival d'avril à octobre.
+      La part stockable est une estimation théorique basée sur le surplus solaire journalier moyen comparé à la capacité choisie.
+    </div>
+
+  </div>
+
+  <script>
+    const monthlyReference = [
+      36.40, 53.58, 91.13, 119.51, 127.91, 127.43,
+      127.51, 115.39, 102.07, 73.39, 46.00, 30.66
+    ];
+
+    const daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31];
+
+    const months = [
+      "Jan","Fév","Mar","Avr","Mai","Juin",
+      "Juil","Août","Sep","Oct","Nov","Déc"
+    ];
+
+    const winterMonths = new Set([0,1,2,10,11]);
+
+    const panelCount = document.getElementById("panelCount");
+    const panelPower = document.getElementById("panelPower");
+    const winterSelfConsumption = document.getElementById("winterSelfConsumption");
+    const summerSelfConsumption = document.getElementById("summerSelfConsumption");
+    const batteryCapacity = document.getElementById("batteryCapacity");
+
+    const peakPower = document.getElementById("peakPower");
+    const annualProduction = document.getElementById("annualProduction");
+
+    const commonScales = {
+      x:{
+        grid:{ display:false },
+        ticks:{
+          color:"#555",
+          font:{ size:12, weight:"600" }
+        }
+      },
+      y:{
+        beginAtZero:true,
+        border:{ display:false },
+        grid:{ color:"rgba(0,0,0,.07)" },
+        ticks:{ color:"#777" }
+      }
+    };
+
+    const monthlyChart = new Chart(
+      document.getElementById("monthlyChart"),
+      {
+        type:"bar",
+        data:{
+          labels:months,
+          datasets:[{
+            label:"Production solaire",
+            data:[],
+            backgroundColor:"#c5f90b",
+            borderColor:"#171717",
+            borderWidth:1,
+            borderRadius:5,
+            maxBarThickness:54
+          }]
+        },
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          animation:{ duration:350 },
+          plugins:{
+            legend:{ display:false },
+            tooltip:{
+              displayColors:false,
+              callbacks:{
+                label:(context) =>
+                  context.raw.toLocaleString("fr-FR", {
+                    maximumFractionDigits:0
+                  }) + " kWh/mois"
+              }
+            }
+          },
+          scales:{
+            x:commonScales.x,
+            y:{
+              ...commonScales.y,
+              title:{
+                display:true,
+                text:"kWh / mois",
+                color:"#555",
+                font:{weight:"600"}
+              }
+            }
+          }
+        }
+      }
+    );
+
+    const dailyChart = new Chart(
+      document.getElementById("dailyChart"),
+      {
+        type:"bar",
+        data:{
+          labels:months,
+          datasets:[
+            {
+              label:"Énergie autoconsommée",
+              data:[],
+              backgroundColor:"#2387d9",
+              borderWidth:0,
+              borderRadius:3,
+              stack:"production",
+              maxBarThickness:54
+            },
+            {
+              label:"Surplus solaire",
+              data:[],
+              backgroundColor:"#c5f90b",
+              borderColor:"#171717",
+              borderWidth:1,
+              borderRadius:3,
+              stack:"production",
+              maxBarThickness:54
+            }
+          ]
+        },
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          animation:{ duration:350 },
+          plugins:{
+            legend:{ display:false },
+            tooltip:{
+              mode:"index",
+              intersect:false,
+              callbacks:{
+                label:(context) => {
+                  const value = context.raw || 0;
+                  return context.dataset.label + " : " +
+                    value.toLocaleString("fr-FR", {
+                      minimumFractionDigits:1,
+                      maximumFractionDigits:1
+                    }) + " kWh/jour";
+                },
+                footer:(items) => {
+                  const total = items.reduce((sum, item) => sum + (item.raw || 0), 0);
+                  return "Production totale : " +
+                    total.toLocaleString("fr-FR", {
+                      minimumFractionDigits:1,
+                      maximumFractionDigits:1
+                    }) + " kWh/jour";
+                }
+              }
+            }
+          },
+          scales:{
+            x:{
+              ...commonScales.x,
+              stacked:true
+            },
+            y:{
+              ...commonScales.y,
+              stacked:true,
+              title:{
+                display:true,
+                text:"kWh / jour",
+                color:"#555",
+                font:{weight:"600"}
+              }
+            }
+          }
+        }
+      }
+    );
+
+    const batteryChart = new Chart(
+      document.getElementById("batteryChart"),
+      {
+        data:{
+          labels:months,
+          datasets:[
+            {
+              type:"bar",
+              label:"Surplus solaire",
+              data:[],
+              backgroundColor:"rgba(197,249,11,0.55)",
+              borderColor:"#171717",
+              borderWidth:1,
+              borderRadius:3,
+              maxBarThickness:54,
+              order:2
+            },
+            {
+              type:"bar",
+              label:"Part théoriquement stockable",
+              data:[],
+              backgroundColor:"#2387d9",
+              borderWidth:0,
+              borderRadius:3,
+              maxBarThickness:30,
+              order:1
+            },
+            {
+              type:"line",
+              label:"Capacité batterie",
+              data:[],
+              borderColor:"#e45757",
+              borderWidth:3,
+              pointRadius:0,
+              pointHoverRadius:0,
+              tension:0,
+              fill:false,
+              order:0
+            }
+          ]
+        },
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          animation:{ duration:350 },
+          plugins:{
+            legend:{ display:false },
+            tooltip:{
+              mode:"index",
+              intersect:false,
+              callbacks:{
+                label:(context) => {
+                  const value = context.raw || 0;
+                  return context.dataset.label + " : " +
+                    value.toLocaleString("fr-FR", {
+                      minimumFractionDigits:1,
+                      maximumFractionDigits:1
+                    }) + " kWh/jour";
+                }
+              }
+            }
+          },
+          scales:{
+            x:commonScales.x,
+            y:{
+              ...commonScales.y,
+              title:{
+                display:true,
+                text:"kWh / jour",
+                color:"#555",
+                font:{weight:"600"}
+              }
+            }
+          }
+        }
+      }
+    );
+
+    function updateSimulator(){
+      const count = Math.max(0, parseInt(panelCount.value, 10) || 0);
+      const power = parseFloat(panelPower.value) || 0;
+      const winterRate = (parseFloat(winterSelfConsumption.value) || 0) / 100;
+      const summerRate = (parseFloat(summerSelfConsumption.value) || 0) / 100;
+      const battery = parseFloat(batteryCapacity.value) || 0;
+
+      const kwp = (count * power) / 1000;
+
+      const monthly = monthlyReference.map(v => v * kwp);
+      const annual = monthly.reduce((sum, value) => sum + value, 0);
+      const daily = monthly.map((value, index) => value / daysInMonth[index]);
+
+      const selfConsumedDaily = daily.map((value, index) => {
+        const rate = winterMonths.has(index) ? winterRate : summerRate;
+        return value * rate;
+      });
+
+      const surplusDaily = daily.map((value, index) => {
+        return value - selfConsumedDaily[index];
+      });
+
+      const storableDaily = surplusDaily.map((value) => {
+        return Math.min(value, battery);
+      });
+
+      const batteryLine = months.map(() => battery);
+
+      peakPower.textContent = kwp.toLocaleString("fr-FR", {
+        minimumFractionDigits:2,
+        maximumFractionDigits:2
+      });
+
+      annualProduction.textContent = annual.toLocaleString("fr-FR", {
+        maximumFractionDigits:0
+      });
+
+      monthlyChart.data.datasets[0].data =
+        monthly.map(v => Math.round(v));
+
+      dailyChart.data.datasets[0].data =
+        selfConsumedDaily.map(v => Number(v.toFixed(2)));
+
+      dailyChart.data.datasets[1].data =
+        surplusDaily.map(v => Number(v.toFixed(2)));
+
+      batteryChart.data.datasets[0].data =
+        surplusDaily.map(v => Number(v.toFixed(2)));
+
+      batteryChart.data.datasets[1].data =
+        storableDaily.map(v => Number(v.toFixed(2)));
+
+      batteryChart.data.datasets[2].data =
+        batteryLine.map(v => Number(v.toFixed(2)));
+
+      monthlyChart.update();
+      dailyChart.update();
+      batteryChart.update();
+    }
+
+    panelCount.addEventListener("input", updateSimulator);
+    panelPower.addEventListener("change", updateSimulator);
+    winterSelfConsumption.addEventListener("change", updateSimulator);
+    summerSelfConsumption.addEventListener("change", updateSimulator);
+    batteryCapacity.addEventListener("change", updateSimulator);
+
+    updateSimulator();
+  </script>
+</body>
+</html>
