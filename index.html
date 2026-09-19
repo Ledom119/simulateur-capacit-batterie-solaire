@@ -210,7 +210,7 @@
     }
 
     .chart-title{
-      margin:0 0 5px 0;
+      margin:0 0 16px 0;
       font-size:20px;
       line-height:1.3;
       font-weight:800;
@@ -222,6 +222,62 @@
       font-size:13px;
       line-height:1.5;
       color:var(--muted);
+    }
+
+    .chart-explanation{
+      margin-top:16px;
+      padding:16px 18px;
+      border:1px solid #dfe5ff;
+      border-left:5px solid var(--blue);
+      border-radius:10px;
+      background:#f7f9ff;
+      color:#343a48;
+      font-size:14px;
+      line-height:1.6;
+    }
+
+    .chart-explanation strong{
+      display:block;
+      margin-bottom:4px;
+      color:var(--dark);
+      font-size:15px;
+    }
+
+    .idea-tip{
+      display:flex;
+      align-items:flex-start;
+      gap:10px;
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:9px;
+      background:#f4ffd0;
+      color:#39411e;
+      font-weight:700;
+    }
+
+    .idea-tip-icon{
+      flex:0 0 auto;
+      font-size:22px;
+      line-height:1.2;
+    }
+
+    .daily-self-consumption-estimate{
+      display:block;
+      margin-top:6px;
+      color:var(--blue);
+      font-weight:700;
+    }
+
+    .battery-transition-text{
+      margin:0 0 18px 0;
+      padding:16px 20px;
+      border-left:5px solid var(--green);
+      border-radius:10px;
+      background:#f8fbe9;
+      color:var(--dark);
+      font-size:16px;
+      line-height:1.55;
+      font-weight:600;
     }
 
     .chart-wrap{
@@ -275,6 +331,72 @@
       line-height:1.5;
       text-align:center;
       padding:2px 10px 8px;
+    }
+
+    .profile-modal[hidden]{ display:none; }
+
+    .profile-modal{
+      position:fixed;
+      inset:0;
+      z-index:9999;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      background:rgba(23,23,23,.62);
+    }
+
+    .profile-modal-box{
+      width:min(520px, 100%);
+      padding:26px;
+      border:2px solid var(--green);
+      border-radius:16px;
+      background:#fff;
+      box-shadow:0 22px 60px rgba(0,0,0,.28);
+      text-align:center;
+    }
+
+    .profile-modal-title{
+      margin:0 0 12px;
+      color:var(--dark);
+      font-size:23px;
+      font-weight:800;
+    }
+
+    .profile-modal-text{
+      margin:0;
+      color:#4f5562;
+      font-size:15px;
+      line-height:1.6;
+    }
+
+    .profile-modal-actions{
+      display:flex;
+      justify-content:center;
+      flex-wrap:wrap;
+      gap:12px;
+      margin-top:22px;
+    }
+
+    .profile-modal-button{
+      min-width:145px;
+      padding:12px 18px;
+      border-radius:9px;
+      border:0;
+      font-size:15px;
+      font-weight:800;
+      text-decoration:none;
+      cursor:pointer;
+    }
+
+    .profile-modal-button.ok{
+      color:#fff;
+      background:var(--dark);
+    }
+
+    .profile-modal-button.contact{
+      color:var(--dark);
+      background:var(--green);
     }
 
     @media(max-width:760px){
@@ -434,17 +556,18 @@
     <div class="charts-grid">
     <div class="chart-card">
       <h3 class="chart-title">Production solaire mensuelle estimée</h3>
-      <p class="chart-subtitle">Production totale estimée de l'installation pour chaque mois.</p>
       <div class="chart-wrap">
         <canvas id="monthlyChart"></canvas>
+      </div>
+      <div class="chart-explanation">
+        <strong>Comment lire ce graphique ?</strong>
+        Chaque bâtonnet indique la quantité totale d’électricité que vos panneaux devraient produire pendant le mois.
+        Les bâtonnets sont naturellement plus hauts pendant les mois les plus ensoleillés et plus bas en hiver.
       </div>
     </div>
 
     <div class="chart-card">
       <h3 class="chart-title">Production journalière moyenne et autoconsommation</h3>
-      <p class="chart-subtitle">
-        La hauteur totale de chaque barre représente la production solaire journalière moyenne.
-      </p>
       <div class="chart-wrap">
         <canvas id="dailyChart"></canvas>
       </div>
@@ -459,15 +582,26 @@
           <span>Surplus solaire</span>
         </div>
       </div>
+      <div class="chart-explanation">
+        <strong>Comment lire ce graphique ?</strong>
+        La hauteur totale du bâtonnet représente ce que vos panneaux produisent en moyenne par jour.
+        La partie bleue est l’énergie utilisée directement dans l’habitation : c’est l’autoconsommation. La partie verte est l’énergie solaire produite en trop :
+        elle peut être stockée dans une batterie ou, à défaut, envoyée vers le réseau.
+        <span class="daily-self-consumption-estimate">
+          Avec la consommation encodée, votre autoconsommation directe est estimée à
+          <span id="annualDirectSelfConsumption">0</span> kWh/an.
+        </span>
+      </div>
     </div>
     </div>
 
+    <p class="battery-transition-text">
+      L’énergie qui n’aura pas été autoconsommée sera alors injectée sur le réseau. L’installation d’une batterie permet toutefois
+      de capter cette énergie, dans la limite de la capacité de la batterie.
+    </p>
+
     <div class="chart-card">
       <h3 class="chart-title">Part du surplus solaire théoriquement stockable</h3>
-      <p class="chart-subtitle">
-        En vert : surplus solaire journalier moyen. En bleu : part pouvant être stockée. En noir : consommation journalière moyenne.
-        La ligne rouge représente la capacité de batterie choisie.
-      </p>
       <div class="chart-wrap">
         <canvas id="batteryChart"></canvas>
       </div>
@@ -490,6 +624,12 @@
           <span>Capacité batterie</span>
         </div>
       </div>
+      <div class="chart-explanation">
+        <strong>Comment lire ce graphique ?</strong>
+        Le vert montre l’énergie solaire disponible après l’autoconsommation. Le bleu montre la partie que la batterie peut récupérer.
+        Le bâtonnet noir représente votre consommation moyenne par jour et la ligne rouge la capacité de batterie choisie.
+        Lorsque le vert dépasse le bleu, une partie du surplus ne peut pas être stockée et sera injectée sur le réseau.
+      </div>
     </div>
 
     <div class="card network-breakdown">
@@ -510,10 +650,6 @@
 
     <div class="chart-card">
       <h3 class="chart-title">Comment se répartit votre consommation ?</h3>
-      <p class="chart-subtitle">
-        Chaque bâtonnet représente la consommation journalière moyenne du mois. La partie violette hachurée montre la part de l’énergie achetée
-        au réseau qui pourrait être achetée au tarif dynamique.
-      </p>
       <div class="chart-wrap">
         <canvas id="consumptionBreakdownChart"></canvas>
       </div>
@@ -523,19 +659,34 @@
         <div class="legend-item"><span class="legend-dot dynamic"></span><span>Achat réseau possible au tarif dynamique</span></div>
         <div class="legend-item"><span class="legend-dot red"></span><span>Achat réseau hors tarif dynamique</span></div>
       </div>
+      <div class="chart-explanation">
+        <strong>Comment lire ce graphique ?</strong>
+        Chaque bâtonnet représente toute l’électricité consommée en moyenne pendant une journée du mois.
+        Le bleu vient directement des panneaux et le vert de la batterie. Le violet hachuré représente la part pouvant être achetée
+        aux heures les moins chères grâce au tarif dynamique. Le rouge représente l’énergie qui reste à acheter au réseau au tarif normal.
+        <div class="idea-tip">
+          <span class="idea-tip-icon" aria-hidden="true">💡</span>
+          <span>Idée : pour augmenter la part d’énergie achetée à un prix intéressant grâce au tarif dynamique, augmentez la capacité de la batterie.</span>
+        </div>
+      </div>
     </div>
 
     <div class="chart-card">
       <h3 class="chart-title">Énergie solaire injectée au réseau</h3>
-      <p class="chart-subtitle">
-        Ce graphique présente, pour chaque mois, l’énergie solaire journalière moyenne qui reste après avoir retiré
-        l’énergie autoconsommée directement et celle stockée dans la batterie.
-      </p>
       <div class="chart-wrap">
         <canvas id="gridInjectionChart"></canvas>
       </div>
       <div class="legend-note">
         <div class="legend-item"><span class="legend-dot injection"></span><span>Énergie injectée au réseau</span></div>
+      </div>
+      <div class="chart-explanation">
+        <strong>Comment lire ce graphique ?</strong>
+        Les bâtonnets représentent la part de l’énergie solaire qui n’a pas pu être autoconsommée et qui n’a pas pu être stockée
+        dans la batterie, car la capacité de celle-ci est limitée.
+        <div class="idea-tip">
+          <span class="idea-tip-icon" aria-hidden="true">💡</span>
+          <span>Idée : pour diminuer cette énergie injectée sur le réseau, et donc perdue pour votre habitation, augmentez la capacité de la batterie.</span>
+        </div>
       </div>
     </div>
 
@@ -553,6 +704,20 @@
       La part stockable est une estimation théorique basée sur le surplus solaire journalier moyen comparé à la capacité choisie.
     </div>
 
+  </div>
+
+  <div class="profile-modal" id="profileModal" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle" hidden>
+    <div class="profile-modal-box">
+      <h3 class="profile-modal-title" id="profileModalTitle">Analyse personnalisée EVO-Sun</h3>
+      <p class="profile-modal-text">
+        Ce profil de consommation demande une analyse plus précise. Cette zone est réservée à EVO-Sun afin de tenir compte
+        du fonctionnement réel de votre pompe à chaleur, de votre piscine ou de votre véhicule électrique.
+      </p>
+      <div class="profile-modal-actions">
+        <button class="profile-modal-button ok" id="profileModalOk" type="button">OK</button>
+        <a class="profile-modal-button contact" id="profileContactLink" href="#" target="_top">Nous contacter</a>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -592,6 +757,14 @@
 
     // ====================== FIN DE LA ZONE À MODIFIER ======================
 
+    // ================================================================
+    // LIEN À MODIFIER : PAGE INTERNE « NOUS CONTACTER » D’EVO-SUN
+    // ================================================================
+    // Remplacez uniquement l’adresse entre les guillemets ci-dessous.
+    // Si le simulateur est affiché dans une iframe, utilisez l’adresse complète.
+    const EVOSUN_CONTACT_PAGE_URL = "https://www.evosun.be/contactus";
+    // ====================== FIN DU LIEN À MODIFIER =====================
+
     const months = [
       "Jan","Fév","Mar","Avr","Mai","Juin",
       "Juil","Août","Sep","Oct","Nov","Déc"
@@ -605,6 +778,10 @@
     const monthlyNetworkGrid = document.getElementById("monthlyNetworkGrid");
     const annualNetworkPurchase = document.getElementById("annualNetworkPurchase");
     const annualGridInjection = document.getElementById("annualGridInjection");
+    const annualDirectSelfConsumption = document.getElementById("annualDirectSelfConsumption");
+    const profileModal = document.getElementById("profileModal");
+    const profileModalOk = document.getElementById("profileModalOk");
+    const profileContactLink = document.getElementById("profileContactLink");
     const panelCount = document.getElementById("panelCount");
     const panelPower = document.getElementById("panelPower");
     const winterSelfConsumption = document.getElementById("winterSelfConsumption");
@@ -765,7 +942,7 @@
               type:"bar",
               label:"Surplus solaire",
               data:[],
-              backgroundColor:"rgba(197,249,11,0.55)",
+              backgroundColor:"#c5f90b",
               borderColor:"#171717",
               borderWidth:1,
               borderRadius:3,
@@ -1069,6 +1246,7 @@
       const monthlyDirectUsed = directUsedDaily.map((value, index) => value * daysInMonth[index]);
       const monthlyBatteryUsed = batteryUsedDaily.map((value, index) => value * daysInMonth[index]);
       const monthlyNetworkPurchase = networkDaily.map((value, index) => value * daysInMonth[index]);
+      const yearlyDirectUsed = monthlyDirectUsed.reduce((sum, value) => sum + value, 0);
       const yearlyNetworkPurchase = monthlyNetworkPurchase.reduce((sum, value) => sum + value, 0);
 
       monthlyConsumptionGrid.innerHTML = months.map((month, index) => {
@@ -1090,6 +1268,10 @@
         maximumFractionDigits:0
       });
 
+      annualDirectSelfConsumption.textContent = yearlyDirectUsed.toLocaleString("fr-FR", {
+        maximumFractionDigits:0
+      });
+
       peakPower.textContent = kwp.toLocaleString("fr-FR", {
         minimumFractionDigits:2,
         maximumFractionDigits:2
@@ -1103,10 +1285,10 @@
         monthly.map(v => Math.round(v));
 
       dailyChart.data.datasets[0].data =
-        selfConsumedDaily.map(v => Number(v.toFixed(2)));
+        directUsedDaily.map(v => Number(v.toFixed(2)));
 
       dailyChart.data.datasets[1].data =
-        surplusDaily.map(v => Number(v.toFixed(2)));
+        daily.map((value, index) => Number(Math.max(0, value - directUsedDaily[index]).toFixed(2)));
 
       batteryChart.data.datasets[0].data =
         surplusDaily.map(v => Number(v.toFixed(2)));
@@ -1145,7 +1327,27 @@
     }
 
     annualConsumption.addEventListener("input", updateSimulator);
-    consumptionProfile.addEventListener("change", updateSimulator);
+    profileContactLink.href = EVOSUN_CONTACT_PAGE_URL;
+
+    function closeProfileModal(){
+      profileModal.hidden = true;
+    }
+
+    consumptionProfile.addEventListener("change", () => {
+      updateSimulator();
+      if(consumptionProfile.value !== "normal"){
+        profileModal.hidden = false;
+        profileModalOk.focus();
+      }
+    });
+
+    profileModalOk.addEventListener("click", closeProfileModal);
+
+    document.addEventListener("keydown", (event) => {
+      if(event.key === "Escape" && !profileModal.hidden){
+        closeProfileModal();
+      }
+    });
     panelCount.addEventListener("input", updateSimulator);
     panelPower.addEventListener("change", updateSimulator);
     winterSelfConsumption.addEventListener("change", updateSimulator);
