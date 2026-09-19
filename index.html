@@ -34,7 +34,7 @@
 
     .solar-simulator{
       width:100%;
-      max-width:1180px;
+      max-width:none;
       margin:0 auto;
     }
 
@@ -184,6 +184,8 @@
     }
 
     .chart-card{
+      width:100%;
+      min-width:0;
       background:#fff;
       border:1px solid var(--line);
       border-radius:14px;
@@ -283,7 +285,16 @@
     .chart-wrap{
       position:relative;
       width:100%;
+      min-width:0;
+      max-width:none;
       height:330px;
+    }
+
+    .chart-wrap canvas{
+      display:block !important;
+      width:100% !important;
+      max-width:100% !important;
+      height:100% !important;
     }
 
     .legend-note{
@@ -1355,6 +1366,35 @@
     batteryCapacity.addEventListener("change", updateSimulator);
 
     updateSimulator();
+
+    // Odoo peut calculer la largeur de l'iframe après le chargement des graphiques.
+    // Ce redimensionnement garantit que chaque canvas occupe toute la largeur de son cadre.
+    const simulatorCharts = [
+      monthlyChart,
+      dailyChart,
+      batteryChart,
+      consumptionBreakdownChart,
+      gridInjectionChart
+    ];
+
+    let chartResizeFrame = null;
+    function resizeSimulatorCharts(){
+      if(chartResizeFrame) cancelAnimationFrame(chartResizeFrame);
+      chartResizeFrame = requestAnimationFrame(() => {
+        simulatorCharts.forEach(chart => chart.resize());
+      });
+    }
+
+    window.addEventListener("load", resizeSimulatorCharts);
+    window.addEventListener("resize", resizeSimulatorCharts);
+
+    if("ResizeObserver" in window){
+      const simulatorResizeObserver = new ResizeObserver(resizeSimulatorCharts);
+      simulatorResizeObserver.observe(document.querySelector(".solar-simulator"));
+    }
+
+    setTimeout(resizeSimulatorCharts, 150);
+    setTimeout(resizeSimulatorCharts, 700);
   </script>
 </body>
 </html>
